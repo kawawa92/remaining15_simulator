@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>残り15試合シミュレーター</title>
+</head>
+<body>
+<h2>残り15試合シミュレーター（簡易版）</h2>
+
+<p>現在得点: <input id="start" type="number" value="50"></p>
+<p>目標得点: <input id="target" type="number" value="80"></p>
+<p>許容差: <input id="range" type="number" value="3"></p>
+<p>1億ボーナス:
+<select id="bonus">
+<option value="1">ON</option>
+<option value="0">OFF</option>
+</select></p>
+
+<p>開始前の直近結果:
+<select id="last">
+<option value="none">なし</option>
+<option value="win">勝ち</option>
+<option value="lose">負け</option>
+</select></p>
+
+<h3>勝敗入力（左から順）</h3>
+<div id="inputs"></div>
+
+<button onclick="calc()">計算</button>
+
+<pre id="result"></pre>
+
+<script>
+const inputsDiv = document.getElementById("inputs");
+for(let i=0;i<15;i++){
+  const sel=document.createElement("select");
+  sel.innerHTML = "<option value=''>未入力</option><option value='win'>○</option><option value='lose'>×</option>";
+  inputsDiv.appendChild(sel);
+}
+
+function calc(){
+  const start = Number(document.getElementById("start").value);
+  const target = Number(document.getElementById("target").value);
+  const range = Number(document.getElementById("range").value);
+  const bonus = Number(document.getElementById("bonus").value);
+  const last = document.getElementById("last").value;
+
+  const selects = inputsDiv.querySelectorAll("select");
+
+  let fixed = [];
+  for(let s of selects){
+    if(s.value==="") break;
+    fixed.push(s.value);
+  }
+
+  const remaining = 15 - fixed.length;
+  const total = Math.pow(2, remaining);
+
+  let results = [];
+
+  for(let mask=0; mask<total; mask++){
+    let seq = [...fixed];
+
+    for(let i=0;i<remaining;i++){
+      seq.push((mask & (1<<i)) ? "win":"lose");
+    }
+
+    let score=0;
+    let prev = (last==="win");
+
+    for(let r of seq){
+      if(bonus) score+=1;
+      if(r==="win"){
+        score+=3;
+        if(prev) score+=2;
+        prev=true;
+      }else{
+        prev=false;
+      }
+    }
+
+    const final = start + score;
+    const diff = final - target;
+
+    if(Math.abs(diff)<=range){
+      results.push(seq.map(r=>r==="win"?"○":"×").join("")+" → "+final);
+    }
+  }
+
+  document.getElementById("result").textContent =
+    results.slice(0,50).join("\n") + "\n件数:"+results.length;
+}
+</script>
+
+</body>
+</html>
