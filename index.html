@@ -1,96 +1,539 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<title>残り15試合シミュレーター</title>
-</head>
-<body>
-<h2>残り15試合シミュレーター</h2>
-
-<p>現在得点: <input id="start" type="number" value="50"></p>
-<p>目標得点: <input id="target" type="number" value="80"></p>
-<p>許容差: <input id="range" type="number" value="3"></p>
-<p>1億ボーナス:
-<select id="bonus">
-<option value="1">ON</option>
-<option value="0">OFF</option>
-</select></p>
-
-<p>開始前の直近結果:
-<select id="last">
-<option value="none">なし</option>
-<option value="win">勝ち</option>
-<option value="lose">負け</option>
-</select></p>
-
-<h3>勝敗入力（左から順）</h3>
-<div id="inputs"></div>
-
-<button onclick="calc()">計算</button>
-
-<pre id="result"></pre>
-
-<script>
-const inputsDiv = document.getElementById("inputs");
-for(let i=0;i<15;i++){
-  const sel=document.createElement("select");
-  sel.innerHTML = "<option value=''>未入力</option><option value='win'>○</option><option value='lose'>×</option>";
-  inputsDiv.appendChild(sel);
-}
-
-function calc(){
-  const start = Number(document.getElementById("start").value);
-  const target = Number(document.getElementById("target").value);
-  const range = Number(document.getElementById("range").value);
-  const bonus = Number(document.getElementById("bonus").value);
-  const last = document.getElementById("last").value;
-
-  const selects = inputsDiv.querySelectorAll("select");
-
-  let fixed = [];
-  for(let s of selects){
-    if(s.value==="") break;
-    fixed.push(s.value);
-  }
-
-  const remaining = 15 - fixed.length;
-  const total = Math.pow(2, remaining);
-
-  let results = [];
-
-  for(let mask=0; mask<total; mask++){
-    let seq = [...fixed];
-
-    for(let i=0;i<remaining;i++){
-      seq.push((mask & (1<<i)) ? "win":"lose");
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>残り15試合シミュレーター</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 1100px;
+      margin: 16px auto;
+      padding: 0 12px 32px;
+      line-height: 1.5;
+      background: #f7f7f7;
+      color: #222;
     }
 
-    let score=0;
-    let prev = (last==="win");
+    h1 {
+      font-size: 24px;
+      margin-bottom: 16px;
+    }
 
-    for(let r of seq){
-      if(bonus) score+=1;
-      if(r==="win"){
-        score+=3;
-        if(prev) score+=2;
-        prev=true;
-      }else{
-        prev=false;
+    .form-box,
+    .result-box {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      min-width: 180px;
+      flex: 1;
+    }
+
+    label {
+      font-weight: bold;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+
+    input,
+    select,
+    button {
+      font-size: 16px;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+    }
+
+    input[readonly] {
+      background: #f3f4f6;
+    }
+
+    button {
+      cursor: pointer;
+      border: none;
+      background: #1f6feb;
+      color: #fff;
+      font-weight: bold;
+      width: 100%;
+      margin-top: 8px;
+    }
+
+    button:active {
+      opacity: 0.9;
+    }
+
+    .note {
+      color: #666;
+      font-size: 13px;
+      margin-top: 10px;
+    }
+
+    .games-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .game-card {
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      padding: 12px;
+      background: #fafafa;
+    }
+
+    .game-title {
+      font-weight: bold;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    .game-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .summary {
+      margin: 12px 0 16px;
+      font-weight: bold;
+      font-size: 16px;
+    }
+
+    .group-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .group-card {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      padding: 14px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+    }
+
+    .group-card.exact {
+      border: 2px solid #16a34a;
+      background: #f0fff4;
+    }
+
+    .group-card.near {
+      border: 2px solid #f59e0b;
+      background: #fffaf0;
+    }
+
+    .group-title {
+      font-weight: bold;
+      font-size: 17px;
+      margin-bottom: 8px;
+    }
+
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 12px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      margin-left: 6px;
+      vertical-align: middle;
+      font-weight: bold;
+    }
+
+    .badge-exact {
+      background: #16a34a;
+      color: #fff;
+    }
+
+    .badge-near {
+      background: #f59e0b;
+      color: #fff;
+    }
+
+    .patterns {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .pattern-chip {
+      background: #eef2ff;
+      border: 1px solid #c7d2fe;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-family: monospace;
+      font-size: 15px;
+      white-space: nowrap;
+    }
+
+    .empty {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    @media (max-width: 900px) {
+      .games-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
 
-    const final = start + score;
-    const diff = final - target;
+    @media (max-width: 640px) {
+      h1 {
+        font-size: 22px;
+      }
 
-    if(Math.abs(diff)<=range){
-      results.push(seq.map(r=>r==="win"?"○":"×").join("")+" → "+final);
+      .games-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .meta {
+        grid-template-columns: 1fr;
+      }
+
+      .pattern-chip {
+        font-size: 14px;
+      }
     }
-  }
+  </style>
+</head>
+<body>
+  <h1>残り15試合シミュレーター</h1>
 
-  document.getElementById("result").textContent =
-    results.slice(0,50).join("\n") + "\n件数:"+results.length;
-}
-</script>
+  <div class="form-box">
+    <div class="row">
+      <div class="field">
+        <label for="startScore">開始時点得点</label>
+        <input type="number" id="startScore" value="0" />
+      </div>
 
+      <div class="field">
+        <label for="currentScore">現在得点（自動計算）</label>
+        <input type="number" id="currentScore" value="0" readonly />
+      </div>
+
+      <div class="field">
+        <label for="targetScore">目標得点</label>
+        <input type="number" id="targetScore" value="0" />
+      </div>
+
+      <div class="field">
+        <label for="allowance">許容差</label>
+        <input type="number" id="allowance" value="0" />
+      </div>
+
+      <div class="field">
+        <label for="lastResult">15試合開始前の直近結果</label>
+        <select id="lastResult">
+          <option value="none">なし</option>
+          <option value="win">勝ち</option>
+          <option value="lose">負け</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="note">
+      ※ 各試合ごとに、勝敗と1億ボーナスの有無を設定できます。<br />
+      ※ 入力済み試合から現在得点を自動更新します。<br />
+      ※ 未入力試合は勝敗だけを総当たり計算し、ボーナス設定は各試合の選択値を使います。<br />
+      ※ 勝ち +3、連勝中の勝ち +2、1億ボーナスON +1 です。
+    </div>
+  </div>
+
+  <div class="form-box">
+    <div><strong>15試合入力</strong></div>
+    <div id="gamesGrid" class="games-grid"></div>
+    <button onclick="calculatePatterns()">残り試合の組み合わせを計算</button>
+  </div>
+
+  <div class="result-box">
+    <div id="summary" class="summary">該当グループ: 0件</div>
+    <div id="result">
+      <div class="empty">勝敗を入力して計算してください。</div>
+    </div>
+  </div>
+
+  <script>
+    const TOTAL_GAMES = 15;
+
+    function createGameInputs() {
+      const grid = document.getElementById("gamesGrid");
+      grid.innerHTML = "";
+
+      for (let i = 0; i < TOTAL_GAMES; i++) {
+        const card = document.createElement("div");
+        card.className = "game-card";
+
+        card.innerHTML = `
+          <div class="game-title">第${i + 1}試合</div>
+          <div class="game-controls">
+            <select class="game-result" data-index="${i}">
+              <option value="">未入力</option>
+              <option value="win">○ 勝ち</option>
+              <option value="lose">× 負け</option>
+            </select>
+
+            <select class="game-bonus" data-index="${i}">
+              <option value="1">1億ボーナス ON</option>
+              <option value="0">1億ボーナス OFF</option>
+            </select>
+          </div>
+        `;
+
+        grid.appendChild(card);
+      }
+
+      document.querySelectorAll(".game-result, .game-bonus").forEach((el) => {
+        el.addEventListener("change", () => {
+          updateCurrentScore();
+        });
+      });
+    }
+
+    function getGameInputs() {
+      const results = Array.from(document.querySelectorAll(".game-result")).map((el) => el.value);
+      const bonuses = Array.from(document.querySelectorAll(".game-bonus")).map((el) => Number(el.value));
+      return { results, bonuses };
+    }
+
+    function calculateSequenceScore(sequence, bonuses, lastResult) {
+      let gainedScore = 0;
+      let winCount = 0;
+      let streakBonus = 0;
+      let prevWin = (lastResult === "win");
+
+      for (let i = 0; i < sequence.length; i++) {
+        const result = sequence[i];
+        const bonus = bonuses[i] || 0;
+
+        if (bonus === 1) {
+          gainedScore += 1;
+        }
+
+        if (result === "win") {
+          gainedScore += 3;
+          winCount++;
+
+          if (prevWin) {
+            gainedScore += 2;
+            streakBonus += 2;
+          }
+
+          prevWin = true;
+        } else if (result === "lose") {
+          prevWin = false;
+        }
+      }
+
+      return {
+        gainedScore,
+        winCount,
+        streakBonus,
+        endPrevWin: prevWin
+      };
+    }
+
+    function getFilledPrefix(results) {
+      const filled = [];
+      for (const r of results) {
+        if (r === "") break;
+        filled.push(r);
+      }
+      return filled;
+    }
+
+    function hasGap(results) {
+      let seenBlank = false;
+      for (const r of results) {
+        if (r === "") {
+          seenBlank = true;
+        } else if (seenBlank) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function updateCurrentScore() {
+      const startScore = Number(document.getElementById("startScore").value) || 0;
+      const lastResult = document.getElementById("lastResult").value;
+      const { results, bonuses } = getGameInputs();
+
+      const filledResults = getFilledPrefix(results);
+      const filledBonuses = bonuses.slice(0, filledResults.length);
+
+      const calc = calculateSequenceScore(filledResults, filledBonuses, lastResult);
+      document.getElementById("currentScore").value = startScore + calc.gainedScore;
+    }
+
+    function calculatePatterns() {
+      const startScore = Number(document.getElementById("startScore").value) || 0;
+      const targetScore = Number(document.getElementById("targetScore").value) || 0;
+      const allowance = Number(document.getElementById("allowance").value) || 0;
+      const lastResult = document.getElementById("lastResult").value;
+      const { results, bonuses } = getGameInputs();
+
+      if (hasGap(results)) {
+        document.getElementById("summary").textContent = "該当グループ: 0件";
+        document.getElementById("result").innerHTML =
+          '<div class="empty">勝敗入力は左から順に入れてください。途中を空けることはできません。</div>';
+        return;
+      }
+
+      const fixedResults = getFilledPrefix(results);
+      const fixedBonuses = bonuses.slice(0, fixedResults.length);
+      const remainingCount = TOTAL_GAMES - fixedResults.length;
+
+      const fixedCalc = calculateSequenceScore(fixedResults, fixedBonuses, lastResult);
+      const currentScore = startScore + fixedCalc.gainedScore;
+      document.getElementById("currentScore").value = currentScore;
+
+      const remainingBonuses = bonuses.slice(fixedResults.length);
+      const groupedMap = new Map();
+      const totalPatterns = Math.pow(2, remainingCount);
+
+      for (let mask = 0; mask < totalPatterns; mask++) {
+        const remainingResults = [];
+
+        for (let i = remainingCount - 1; i >= 0; i--) {
+          const isWin = (mask & (1 << i)) !== 0;
+          remainingResults.push(isWin ? "win" : "lose");
+        }
+
+        const remainingLastResult = fixedResults.length === 0
+          ? lastResult
+          : fixedResults[fixedResults.length - 1];
+
+        const remainingCalc = calculateSequenceScore(
+          remainingResults,
+          remainingBonuses,
+          remainingLastResult
+        );
+
+        const finalScore = currentScore + remainingCalc.gainedScore;
+        const diff = finalScore - targetScore;
+
+        if (Math.abs(diff) <= allowance) {
+          const winCount = remainingCalc.winCount;
+          const streakBonus = remainingCalc.streakBonus;
+          const key = `${winCount}_${streakBonus}`;
+          const patternText = remainingResults.map(r => r === "win" ? "○" : "×").join("");
+
+          if (!groupedMap.has(key)) {
+            groupedMap.set(key, {
+              winCount,
+              streakBonus,
+              gainedScore: remainingCalc.gainedScore,
+              finalScore,
+              diff,
+              patterns: []
+            });
+          }
+
+          groupedMap.get(key).patterns.push(patternText);
+        }
+      }
+
+      const groups = Array.from(groupedMap.values());
+
+      groups.sort((a, b) => {
+        const diffA = Math.abs(a.diff);
+        const diffB = Math.abs(b.diff);
+
+        if (diffA !== diffB) return diffA - diffB;
+        if (a.winCount !== b.winCount) return a.winCount - b.winCount;
+        if (a.streakBonus !== b.streakBonus) return a.streakBonus - b.streakBonus;
+        return a.patterns.length - b.patterns.length;
+      });
+
+      document.getElementById("summary").textContent =
+        `該当グループ: ${groups.length}件 / 現在得点: ${currentScore}点 / 残り試合数: ${remainingCount}`;
+
+      if (groups.length === 0) {
+        document.getElementById("result").innerHTML =
+          '<div class="empty">条件に合う組み合わせはありません。</div>';
+        return;
+      }
+
+      let html = '<div class="group-list">';
+
+      for (const group of groups) {
+        const absDiff = Math.abs(group.diff);
+        const diffText = group.diff > 0 ? `+${group.diff}` : `${group.diff}`;
+
+        let cardClass = "group-card";
+        let badgeHtml = "";
+
+        if (group.diff === 0) {
+          cardClass += " exact";
+          badgeHtml = '<span class="badge badge-exact">ピッタリ</span>';
+        } else if (absDiff <= 1) {
+          cardClass += " near";
+          badgeHtml = '<span class="badge badge-near">おしい</span>';
+        }
+
+        const patternHtml = group.patterns
+          .sort()
+          .map((p) => `<span class="pattern-chip">${p || "入力済みで残りなし"}</span>`)
+          .join("");
+
+        html += `
+          <div class="${cardClass}">
+            <div class="group-title">
+              最終得点: ${group.finalScore}点
+              ${badgeHtml}
+            </div>
+
+            <div class="meta">
+              <div>目標との差: <strong>${diffText}</strong></div>
+              <div>残り試合の獲得点: <strong>${group.gainedScore}</strong></div>
+              <div>残り試合の勝数: <strong>${group.winCount}</strong></div>
+              <div>残り試合の連勝ボーナス: <strong>${group.streakBonus}</strong></div>
+              <div>パターン数: <strong>${group.patterns.length}</strong></div>
+            </div>
+
+            <div class="patterns">
+              ${patternHtml}
+            </div>
+          </div>
+        `;
+      }
+
+      html += "</div>";
+      document.getElementById("result").innerHTML = html;
+    }
+
+    document.getElementById("startScore").addEventListener("input", updateCurrentScore);
+    document.getElementById("lastResult").addEventListener("change", updateCurrentScore);
+
+    createGameInputs();
+    updateCurrentScore();
+  </script>
 </body>
 </html>
