@@ -56,51 +56,32 @@
     box-sizing: border-box;
   }
 
-  input[readonly] {
-    background: #f3f4f6;
-  }
-
   button {
     background: #2563eb;
     color: #fff;
     border: none;
     cursor: pointer;
     font-weight: bold;
+    padding: 10px 16px;
   }
 
-  .row {
-    display: flex;
-    gap: 8px;
+  .boardBox {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    padding: 12px;
     margin-bottom: 10px;
+  }
+
+  .boardRow {
+    display: flex;
+    gap: 6px;
     overflow-x: auto;
   }
 
-  .row:last-child {
-    margin-bottom: 0;
-  }
-
-  .group {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    border-right: 2px solid #cbd5e1;
-    padding-right: 8px;
-  }
-
-  .group:last-child {
-    border-right: none;
-  }
-
-  .dayLabel {
-    font-size: 11px;
-    color: #666;
-    margin-bottom: 4px;
-    font-weight: bold;
-  }
-
-  .cellRow {
-    display: flex;
-    gap: 6px;
+  .boardDivider {
+    border-top: 2px solid #cbd5e1;
+    margin: 10px 0;
   }
 
   .cell {
@@ -140,6 +121,16 @@
     height: 14px;
     margin: 0;
     accent-color: #2563eb;
+  }
+
+  .scoreBar {
+    font-weight: bold;
+    font-size: 16px;
+    margin: 0 0 10px;
+  }
+
+  .buttonWrap {
+    margin-bottom: 12px;
   }
 
   .note {
@@ -232,11 +223,6 @@
       </div>
 
       <div class="field">
-        <label for="currentScore">累計得点</label>
-        <input type="number" id="currentScore" value="0" readonly />
-      </div>
-
-      <div class="field">
         <label for="targetScore">目標得点</label>
         <input type="number" id="targetScore" value="0" />
       </div>
@@ -258,10 +244,17 @@
     </div>
   </div>
 
-  <div class="box">
-    <div class="row" id="row1"></div>
-    <div class="row" id="row2"></div>
-    <div class="row" id="row3"></div>
+  <div class="scoreBar" id="scoreBar">累計得点: 0点</div>
+
+  <div class="boardBox">
+    <div class="boardRow" id="row1"></div>
+    <div class="boardDivider"></div>
+    <div class="boardRow" id="row2"></div>
+    <div class="boardDivider"></div>
+    <div class="boardRow" id="row3"></div>
+  </div>
+
+  <div class="buttonWrap">
     <button onclick="calculatePatterns()">残りパターン計算</button>
   </div>
 
@@ -275,7 +268,6 @@
 
 <script>
   const TOTAL_GAMES = 9;
-  const ROW_LABELS = ["1", "2", "3"];
   const ALLOWANCE = 3;
 
   function createCell(index) {
@@ -321,30 +313,20 @@
     return cell;
   }
 
-  function createGroup(labelText, startIndex) {
-    const group = document.createElement("div");
-    group.className = "group";
-
-    const label = document.createElement("div");
-    label.className = "dayLabel";
-    label.textContent = labelText;
-
-    const cellRow = document.createElement("div");
-    cellRow.className = "cellRow";
+  function initBoard() {
+    const row1 = document.getElementById("row1");
+    const row2 = document.getElementById("row2");
+    const row3 = document.getElementById("row3");
 
     for (let i = 0; i < 3; i++) {
-      cellRow.appendChild(createCell(startIndex + i));
+      row1.appendChild(createCell(i));
     }
-
-    group.appendChild(label);
-    group.appendChild(cellRow);
-    return group;
-  }
-
-  function initBoard() {
-    document.getElementById("row1").appendChild(createGroup(ROW_LABELS[0], 0));
-    document.getElementById("row2").appendChild(createGroup(ROW_LABELS[1], 3));
-    document.getElementById("row3").appendChild(createGroup(ROW_LABELS[2], 6));
+    for (let i = 3; i < 6; i++) {
+      row2.appendChild(createCell(i));
+    }
+    for (let i = 6; i < 9; i++) {
+      row3.appendChild(createCell(i));
+    }
   }
 
   function getResults() {
@@ -422,7 +404,9 @@
     const filledBonuses = bonuses.slice(0, filledResults.length);
 
     const calc = calculateSequenceScore(filledResults, filledBonuses, lastResult);
-    document.getElementById("currentScore").value = baseScore + calc.gainedScore;
+    const totalScore = baseScore + calc.gainedScore;
+
+    document.getElementById("scoreBar").textContent = `累計得点: ${totalScore}点`;
   }
 
   function calculatePatterns() {
@@ -445,7 +429,7 @@
     const fixedCalc = calculateSequenceScore(fixedResults, fixedBonuses, lastResult);
 
     const currentScore = baseScore + fixedCalc.gainedScore;
-    document.getElementById("currentScore").value = currentScore;
+    document.getElementById("scoreBar").textContent = `累計得点: ${currentScore}点`;
 
     const remainingCount = TOTAL_GAMES - fixedResults.length;
     const remainingBonuses = bonuses.slice(fixedResults.length);
