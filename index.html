@@ -40,7 +40,7 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    min-width: 140px;
+    min-width: 160px;
   }
 
   .field label {
@@ -73,6 +73,10 @@
     gap: 8px;
     margin-bottom: 10px;
     overflow-x: auto;
+  }
+
+  .row:last-child {
+    margin-bottom: 0;
   }
 
   .group {
@@ -223,23 +227,18 @@
   <div class="box">
     <div class="topFields">
       <div class="field">
-        <label for="mondayScore">月曜の獲得点</label>
-        <input type="number" id="mondayScore" value="0" />
+        <label for="baseScore">現在の獲得点</label>
+        <input type="number" id="baseScore" value="0" />
       </div>
 
       <div class="field">
-        <label for="currentScore">現在得点</label>
+        <label for="currentScore">累計得点</label>
         <input type="number" id="currentScore" value="0" readonly />
       </div>
 
       <div class="field">
         <label for="targetScore">目標得点</label>
         <input type="number" id="targetScore" value="0" />
-      </div>
-
-      <div class="field">
-        <label for="allowance">許容差</label>
-        <input type="number" id="allowance" value="0" />
       </div>
 
       <div class="field">
@@ -254,12 +253,15 @@
 
     <div class="note">
       勝ち +3点、ボナpあり +1点、連勝中の勝ちはさらに +2点。<br>
+      目標値の ±3点 までを表示します。<br>
       勝敗は左から順に入力。途中を空けて後ろだけ入力は不可。
     </div>
   </div>
 
   <div class="box">
     <div class="row" id="row1"></div>
+    <div class="row" id="row2"></div>
+    <div class="row" id="row3"></div>
     <button onclick="calculatePatterns()">残りパターン計算</button>
   </div>
 
@@ -273,7 +275,8 @@
 
 <script>
   const TOTAL_GAMES = 9;
-  const DAYS = ["火", "水", "木"];
+  const ROW_LABELS = ["1", "2", "3"];
+  const ALLOWANCE = 3;
 
   function createCell(index) {
     const cell = document.createElement("div");
@@ -318,13 +321,13 @@
     return cell;
   }
 
-  function createGroup(dayLabel, startIndex) {
+  function createGroup(labelText, startIndex) {
     const group = document.createElement("div");
     group.className = "group";
 
-    const day = document.createElement("div");
-    day.className = "dayLabel";
-    day.textContent = dayLabel;
+    const label = document.createElement("div");
+    label.className = "dayLabel";
+    label.textContent = labelText;
 
     const cellRow = document.createElement("div");
     cellRow.className = "cellRow";
@@ -333,16 +336,15 @@
       cellRow.appendChild(createCell(startIndex + i));
     }
 
-    group.appendChild(day);
+    group.appendChild(label);
     group.appendChild(cellRow);
     return group;
   }
 
   function initBoard() {
-    const row1 = document.getElementById("row1");
-    row1.appendChild(createGroup(DAYS[0], 0));
-    row1.appendChild(createGroup(DAYS[1], 3));
-    row1.appendChild(createGroup(DAYS[2], 6));
+    document.getElementById("row1").appendChild(createGroup(ROW_LABELS[0], 0));
+    document.getElementById("row2").appendChild(createGroup(ROW_LABELS[1], 3));
+    document.getElementById("row3").appendChild(createGroup(ROW_LABELS[2], 6));
   }
 
   function getResults() {
@@ -411,7 +413,7 @@
   }
 
   function updateCurrentScore() {
-    const mondayScore = Number(document.getElementById("mondayScore").value) || 0;
+    const baseScore = Number(document.getElementById("baseScore").value) || 0;
     const lastResult = document.getElementById("lastResult").value;
     const results = getResults();
     const bonuses = getBonuses();
@@ -420,13 +422,12 @@
     const filledBonuses = bonuses.slice(0, filledResults.length);
 
     const calc = calculateSequenceScore(filledResults, filledBonuses, lastResult);
-    document.getElementById("currentScore").value = mondayScore + calc.gainedScore;
+    document.getElementById("currentScore").value = baseScore + calc.gainedScore;
   }
 
   function calculatePatterns() {
-    const mondayScore = Number(document.getElementById("mondayScore").value) || 0;
+    const baseScore = Number(document.getElementById("baseScore").value) || 0;
     const targetScore = Number(document.getElementById("targetScore").value) || 0;
-    const allowance = Number(document.getElementById("allowance").value) || 0;
     const lastResult = document.getElementById("lastResult").value;
 
     const results = getResults();
@@ -443,7 +444,7 @@
     const fixedBonuses = bonuses.slice(0, fixedResults.length);
     const fixedCalc = calculateSequenceScore(fixedResults, fixedBonuses, lastResult);
 
-    const currentScore = mondayScore + fixedCalc.gainedScore;
+    const currentScore = baseScore + fixedCalc.gainedScore;
     document.getElementById("currentScore").value = currentScore;
 
     const remainingCount = TOTAL_GAMES - fixedResults.length;
@@ -471,7 +472,7 @@
       const finalScore = currentScore + calc.gainedScore;
       const diff = finalScore - targetScore;
 
-      if (Math.abs(diff) <= allowance) {
+      if (Math.abs(diff) <= ALLOWANCE) {
         matchedPatternCount += 1;
 
         const key = `${calc.winCount}_${calc.streakBonus}`;
@@ -505,7 +506,7 @@
       `総パターン数: ${totalPatterns}通り
 条件一致パターン数: ${matchedPatternCount}通り
 該当グループ: ${groups.length}件
-現在得点: ${currentScore}点 / 残り試合数: ${remainingCount}`;
+累計得点: ${currentScore}点 / 残り試合数: ${remainingCount}`;
 
     if (groups.length === 0) {
       document.getElementById("result").innerHTML =
@@ -540,7 +541,7 @@
             <div>残り試合の勝数: <strong>${group.winCount}</strong></div>
             <div>残り試合の連勝ボーナス: <strong>${group.streakBonus}</strong></div>
             <div>パターン数: <strong>${group.patterns.length}</strong></div>
-            <div>許容差: <strong>±${allowance}</strong></div>
+            <div>表示範囲: <strong>目標値 ±3点</strong></div>
           </div>
           <div class="patterns">${patternsHtml}</div>
         </div>
@@ -551,7 +552,7 @@
     document.getElementById("result").innerHTML = html;
   }
 
-  document.getElementById("mondayScore").addEventListener("input", updateCurrentScore);
+  document.getElementById("baseScore").addEventListener("input", updateCurrentScore);
   document.getElementById("lastResult").addEventListener("change", updateCurrentScore);
 
   initBoard();
